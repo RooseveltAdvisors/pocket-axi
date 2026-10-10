@@ -324,8 +324,8 @@ async function main(): Promise<void> {
         const filename = `${dateStr}-pocket-${safeTitle}-${rec.id.substring(0, 8)}.md`;
         const fullPath = join(targetDir, filename);
 
-        const summary = getPrimarySummary(rec);
-
+        const includeVendorSummary = args.includes("--include-vendor-summary");
+        const summary = includeVendorSummary ? getPrimarySummary(rec) : {};
         const mdLines: string[] = [
           "---",
           `title: "${rec.title.replace(/"/g, '\\"')}"`,
@@ -347,18 +347,10 @@ async function main(): Promise<void> {
           "",
           "---",
           "",
-          "## Executive Summary",
-          "",
-          summary.markdown || "(No AI summary available)",
-          "",
         ];
 
-        if (summary.actionItems && summary.actionItems.length > 0) {
-          mdLines.push("## Action Items", "");
-          for (const a of summary.actionItems) {
-            mdLines.push(`- [ ] ${a.label}${a.assignee ? ` (@${a.assignee})` : ""}`);
-          }
-          mdLines.push("", "---", "");
+        if (includeVendorSummary && summary.markdown) {
+          mdLines.push("## Vendor Draft Summary (Unverified)", "", summary.markdown, "", "---", "");
         }
 
         if (rec.transcript?.segments && rec.transcript.segments.length > 0) {

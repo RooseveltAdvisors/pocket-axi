@@ -3,18 +3,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![AXI Standard](https://img.shields.io/badge/standard-axi-purple.svg)](https://axi.md)
 
-An agent-ergonomic CLI and TypeScript SDK for [Pocket AI](https://heypocketai.com) meeting recordings, transcripts, AI summaries, mind maps, and raw audio downloads.
+An agent-ergonomic CLI and TypeScript SDK for [Pocket AI](https://heypocketai.com) meeting recordings, transcripts, and raw audio downloads.
 
 Built according to the [AXI standard](https://axi.md) for direct consumption by autonomous agents (Pi, Codex, Claude Code, Antigravity) and human operators.
+
+---
+
+## Core Philosophy: Dialogue-First Ingestion
+
+Vendor AI summarization tools often hallucinate names, misattribute dialogue turns, or garble domain calculations. `pocket-axi` prioritizes high-fidelity extraction of the **raw transcript segments, timestamps, and audio streams**, giving agents and downstream LLMs the pristine source truth required to synthesize accurate executive summaries.
 
 ---
 
 ## Features
 
 - **Agent-First CLI:** Full JSON output (`--json`) across all commands for structured tool integration.
-- **Selective Extraction:** Extract AI summaries (`--summary`), action items (`--actions`), mind maps (`--mindmap`), or pure transcripts (`--transcript`).
+- **Direct Transcript Pull:** Extract raw transcript text directly (`--transcript`) for high-context agent summarization.
 - **Audio Download:** Resolve presigned S3 URLs (`audio-url`) or stream full audio recordings (`.mp3`) directly to disk.
-- **Obsidian Second Brain Ingestion:** `pocket-axi ingest <id|--latest>` converts any recording into a structured Obsidian markdown note with YAML frontmatter, executive summary, action items checklist, and timestamped transcript turns.
+- **Obsidian Second Brain Ingestion:** `pocket-axi ingest <id|--latest>` converts any recording into a clean, timestamped Obsidian markdown transcript note with YAML frontmatter.
 - **Dual Authentication Modes:** Works standalone with an API key, or transparently through the Agent Vault fleet proxy.
 
 ---
@@ -71,26 +77,21 @@ pocket-axi list --limit 10
 pocket-axi list --limit 10 --json
 ```
 
-### Inspect the Latest Recording
+### Extract Transcripts for Local Synthesis
 ```bash
-# Full overview (metadata + summary + action items + transcript preview)
-pocket-axi latest
-
-# Extract only the AI summary markdown
-pocket-axi latest --summary
-
-# Extract action items as JSON
-pocket-axi latest --actions
-
-# Extract raw transcript text
+# Pull raw transcript text of the latest recording
 pocket-axi latest --transcript
+
+# Pull transcript of a specific recording
+pocket-axi get <recording-id> --transcript
 ```
 
-### Inspect Specific Recording
+### Inspect Metadata
 ```bash
+# Full overview (metadata + segments)
+pocket-axi latest
 pocket-axi get <recording-id>
 pocket-axi get <recording-id> --json
-pocket-axi get <recording-id> --mindmap
 ```
 
 ### Audio Streams & Downloads
@@ -104,7 +105,7 @@ pocket-axi audio <recording-id> --out /tmp/recording.mp3
 
 ### Obsidian Second Brain Ingestion
 ```bash
-# Ingest latest recording directly into a vault directory
+# Ingest latest recording directly into a vault directory as a timestamped transcript note
 pocket-axi ingest --latest --vault-dir "$HOME/Obsidian/second-brain/0. Inbox"
 
 # Ingest specific recording
@@ -127,9 +128,9 @@ const client = new PocketClient({
 // List recordings
 const recordings = await client.listRecordings({ limit: 5 });
 
-// Fetch latest recording
+// Fetch latest recording transcript
 const latest = await client.getLatestRecording();
-console.log(latest?.title);
+console.log(latest?.transcript?.text);
 
 // Download raw audio
 await client.downloadAudio(latest!.id, "/tmp/call.mp3");

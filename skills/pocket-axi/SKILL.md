@@ -1,11 +1,20 @@
 ---
 name: pocket-axi
-description: Read, search, list, transcribe, download, and ingest Pocket AI (heypocketai.com) meeting recordings, transcripts, summaries, and action items. Use when the user asks to check Pocket recordings, ingest recent calls from Pocket, download call audio, or extract meeting action items.
+description: Read, search, list, transcribe, download, and ingest Pocket AI (heypocketai.com) meeting recordings, transcripts, and audio streams. Use when the user asks to check Pocket recordings, ingest recent calls from Pocket, download call audio, or extract meeting dialogue.
 ---
 
 # pocket-axi
 
-The AXI-standard CLI for interacting with Pocket AI meeting recordings, AI summaries, mind maps, and raw audio streams.
+The AXI-standard CLI for interacting with Pocket AI meeting recordings, transcripts, and raw audio streams.
+
+## Core Directives
+
+> [!IMPORTANT]
+> **Do not use Pocket AI's auto-generated summary.** Pocket AI's summarizer frequently hallucinates names, misattributes speakers, and distorts financial and clinical terms (e.g. converting "$400K annual salary" into "$400/hour", or inventing phonetically similar surnames).
+>
+> **Always pull the transcript** (`pocket-axi latest --transcript` or `pocket-axi get <id> --transcript`), and synthesize the executive summary, decisions, and action items yourself directly from the source dialogue turns.
+
+---
 
 ## Quick Reference
 
@@ -16,15 +25,13 @@ pocket-axi list --limit 10
 # Output raw JSON for agent parsing
 pocket-axi list --limit 10 --json
 
-# Inspect latest recording
-pocket-axi latest
-pocket-axi latest --summary
-pocket-axi latest --actions
+# Extract transcript text directly (for our own synthesis)
 pocket-axi latest --transcript
+pocket-axi get <recording-id> --transcript
 
-# Inspect specific recording
+# Inspect metadata & segments
+pocket-axi latest
 pocket-axi get <recording-id>
-pocket-axi get <recording-id> --json
 
 # Resolve presigned S3 download URL
 pocket-axi audio-url <recording-id>
@@ -32,10 +39,12 @@ pocket-axi audio-url <recording-id>
 # Download audio stream to file
 pocket-axi audio <recording-id> --out /tmp/call.mp3
 
-# Ingest to Obsidian Second Brain note
+# Ingest raw transcript note to Obsidian Second Brain
 pocket-axi ingest <recording-id> --vault-dir "/home/jon/Obsidian/second-brain/0. Inbox"
 pocket-axi ingest --latest --vault-dir "/home/jon/Obsidian/second-brain/0. Inbox"
 ```
+
+---
 
 ## Authentication
 
@@ -51,11 +60,14 @@ export POCKET_API_KEY="your-api-key"
 When running inside an Arcs Health managed environment:
 ```bash
 agent-vault fleet proxy-run -- pocket-axi list
-agent-vault fleet proxy-run -- pocket-axi latest
+agent-vault fleet proxy-run -- pocket-axi latest --transcript
 ```
+
+---
 
 ## Obsidian Ingestion Standards
 When ingesting Pocket recordings into the Second Brain:
-- Store transcripts under `attachments/` or embedded in the note.
-- Check and enforce zero em dashes or en dashes outside wikilinks and backticked code.
-- Always cross-reference participants in YAML frontmatter.
+- Always pull the raw dialogue transcript and review speaker turns.
+- Write human-grade executive summaries and topic breakdowns ourselves.
+- Verify zero em dashes (`—`) and zero en dashes (`–`) outside wikilinks and backticked code.
+- Cross-reference participants in YAML frontmatter and link existing entity notes.
