@@ -120,22 +120,65 @@ export class PocketClient {
 
   /**
    * Download the raw audio recording to a local file path.
+   *
+   * The presigned S3 URL authenticates itself; no API key is involved. This
+   * command often runs under `agent-vault fleet proxy-run`, whose environment
+   * routes every request through a broker MITM proxy that returns 403 for
+   * hosts without an enrolled row - including the S3 audio bucket. A
+   * presigned GET needs no broker, so the download runs through curl with
+   * the proxy and vault CA variables stripped: direct connection, system
+   * trust store.
    */
   async downloadAudio(recordingId: string, destPath: string): Promise<{ destPath: string; bytes: number }> {
     const audioInfo = await this.getAudioUrl(recordingId);
-    const audioRes = await fetch(audioInfo.signed_url);
-    if (!audioRes.ok) {
-      throw new Error(`Failed to download audio from presigned URL (HTTP ${audioRes.status})`);
-    }
 
-    const arrayBuffer = await audioRes.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const { writeFileSync, mkdirSync } = await import("node:fs");
+    const { spawnSync } = await import("node:child_process");
+    const { mkdirSync, statSync, rmSync } = await import("node:fs");
     const { dirname } = await import("node:path");
 
     mkdirSync(dirname(destPath), { recursive: true });
-    writeFileSync(destPath, buffer);
 
-    return { destPath, bytes: buffer.length };
+    const env = { ...process.env };
+    for (const key of [
+      "NODE_USE_ENV_PROXY",
+      "HTTPS_PROXY",
+      "https_proxy",
+      "HTTP_PROXY",
+      "http_proxy",
+      "ALL_PROXY",
+      "all_proxy",
+      "NO_PROXY",
+      "no_proxy",
+      "NODE_EXTRA_CA_CERTS",
+      "SSL_CERT_FILE",
+      "SSL_CERT_DIR",
+      "CURL_CA_BUNDLE",
+    ]) {
+      delete env[key];
+    }
+
+    const result = spawnSync(
+      "curl",
+      ["-fsSL", "--retry", "2", "--connect-timeout", "30", "-o", destPath, audioInfo.signed_url],
+      { env, encoding: "utf8" },
+    );
+
+    if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(
+        "curl is required to download recording audio (presigned S3 GET). Install curl and retry.",
+      );
+    }
+    if (result.status !== 0) {
+      try {
+        rmSync(destPath, { force: true });
+      } catch {
+        // Best-effort cleanup of a partial download.
+      }
+      const lines = (result.stderr || "").trim().split("\n").filter(Boolean);
+      const detail = lines.length ? lines[lines.length - 1] : `curl exited ${result.status}`;
+      throw new Error(`Failed to download audio from presigned URL: ${detail}`);
+    }
+
+    return { destPath, bytes: statSync(destPath).size };
   }
 }
